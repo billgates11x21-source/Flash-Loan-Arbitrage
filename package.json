@@ -1,0 +1,23 @@
+{
+  "name": "flash-loan-arbitrage",
+  "version": "1.0.0",
+  "description": "Ethereum Smart Contracts for Arbitrage and Flash Loans",
+  "main": "index.js",
+  "scripts": {
+    "compile": "HARDHAT_DISABLE_ANALYTICS=true hardhat compile",
+    "test": "HARDHAT_DISABLE_ANALYTICS=true hardhat test",
+    "deploy": "HARDHAT_DISABLE_ANALYTICS=true hardhat run scripts/deploy.js",
+    "console": "HARDHAT_DISABLE_ANALYTICS=true hardhat console",
+    "dev": "HARDHAT_DISABLE_ANALYTICS=true hardhat node --hostname 0.0.0.0 --port 8000",
+    "start": "HARDHAT_DISABLE_ANALYTICS=true hardhat compile && echo 'Smart contracts compiled successfully!'"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "hardhat": "^2.26.3"
+  },
+  "dependencies": {
+    "@aave/core-v3": "^1.19.3",
+    "@openzeppelin/contracts": "^4.9.6",
+    "@uniswap/v2-periphery": "^1.1.0-beta.0"
+  }
+}

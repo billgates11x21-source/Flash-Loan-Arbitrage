@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
 
-import "https://github.com/aave/aave-v3-core/blob/master/contracts/flashloan/base/FlashLoanSimpleReceiverBase.sol";
-import "https://github.com/aave/aave-v3-core/blob/master/contracts/interfaces/IPoolAddressesProvider.sol";
-import "https://github.com/aave/aave-v3-core/blob/master/contracts/dependencies/openzeppelin/contracts/IERC20.sol";
+import "@aave/core-v3/contracts/flashloan/base/FlashLoanSimpleReceiverBase.sol";
+import "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 interface IUniswapV2Router {
     function getAmountsOut(uint amountIn, address[] memory path) external view returns (uint[] memory amounts);
@@ -55,6 +55,7 @@ contract SimpleFlashLoan is FlashLoanSimpleReceiverBase {
 
         
         address weth = 0x52D800ca262522580CeBAD275395ca6e7598C014; 
+        address[] memory path = new address[](2);
         path[0] = asset;
         path[1] = weth;
         
