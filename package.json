@@ -9,7 +9,10 @@
     "deploy": "HARDHAT_DISABLE_ANALYTICS=true hardhat run scripts/deploy.js",
     "console": "HARDHAT_DISABLE_ANALYTICS=true hardhat console",
     "dev": "HARDHAT_DISABLE_ANALYTICS=true hardhat node --hostname 0.0.0.0 --port 8000",
-    "start": "HARDHAT_DISABLE_ANALYTICS=true hardhat compile && echo 'Smart contracts compiled successfully!'"
+    "start": "HARDHAT_DISABLE_ANALYTICS=true hardhat compile && echo 'Smart contracts compiled successfully!'",
+    "backend": "node server/index.js",
+    "frontend": "node server/frontend.js",
+    "deploy-base": "HARDHAT_DISABLE_ANALYTICS=true hardhat run scripts/deploy.js --network base"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",
@@ -18,6 +21,10 @@
   "dependencies": {
     "@aave/core-v3": "^1.19.3",
     "@openzeppelin/contracts": "^4.9.6",
-    "@uniswap/v2-periphery": "^1.1.0-beta.0"
+    "@uniswap/v2-periphery": "^1.1.0-beta.0",
+    "cors": "^2.8.5",
+    "ethers": "^5.8.0",
+    "express": "^4.21.2",
+    "node-fetch": "^2.7.0"
   }
 }
