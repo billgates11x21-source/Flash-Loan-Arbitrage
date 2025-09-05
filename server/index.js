@@ -66,11 +66,11 @@ async function getBaseTokenPairs(tokenAddress) {
 
 async function findArbitrageOpportunities() {
   try {
-    // Key tokens on Base to monitor
+    // Key tokens on Base to monitor - using checksummed addresses
     const tokensToMonitor = [
-      "0x4200000000000000000000000000000000000006", // WETH
-      "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // USDC
-      "0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA", // USDbC
+      ethers.utils.getAddress("0x4200000000000000000000000000000000000006"), // WETH
+      ethers.utils.getAddress("0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"), // USDC  
+      ethers.utils.getAddress("0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA"), // USDbC
     ];
 
     const opportunities = [];
@@ -196,20 +196,20 @@ async function executeArbitrage(opportunity) {
     const fee2 = 500;  // 0.05% fee  
     const useAerodrome = opportunity.dex1 === 'aerodrome' || opportunity.dex2 === 'aerodrome';
 
-    // Create struct matching ArbitrageParams in smart contract
-    const arbParams = {
-      tokenIn: tokenIn,
-      tokenOut: tokenOut,  
-      amountIn: amountIn,
-      fee1: fee1,
-      fee2: fee2,
-      useAerodrome: useAerodrome
-    };
+    // Create array matching ArbitrageParams struct order
+    const arbParamsArray = [
+      tokenIn,
+      tokenOut,
+      amountIn,
+      fee1,
+      fee2,
+      useAerodrome
+    ];
 
     // Encode as tuple struct matching smart contract
     const encodedParams = ethers.utils.defaultAbiCoder.encode(
-      ['tuple(address tokenIn, address tokenOut, uint256 amountIn, uint24 fee1, uint24 fee2, bool useAerodrome)'],
-      [arbParams]
+      ['tuple(address,address,uint256,uint24,uint24,bool)'],
+      [arbParamsArray]
     );
 
     // Get optimal gas price
@@ -219,6 +219,15 @@ async function executeArbitrage(opportunity) {
     const validatedContractAddress = ethers.utils.getAddress(contractAddress);
     console.log(`Using validated contract address: ${validatedContractAddress}`);
 
+    console.log("🔍 DEBUG INFO:");
+    console.log("   Token In:", tokenIn);
+    console.log("   Token Out:", tokenOut);
+    console.log("   Loan Amount:", ethers.utils.formatEther(loanAmount));
+    console.log("   Fee1:", fee1);
+    console.log("   Fee2:", fee2);
+    console.log("   Use Aerodrome:", useAerodrome);
+    console.log("   Encoded Params Length:", encodedParams.length);
+
     // Execute flash loan arbitrage with reduced gas limit
     const tx = await contract.executeFlashLoanArbitrage(
       ethers.utils.getAddress(opportunity.tokenIn),
@@ -226,7 +235,7 @@ async function executeArbitrage(opportunity) {
       encodedParams,
       {
         gasPrice: gasPrice,
-        gasLimit: 300000 // Reduced gas limit
+        gasLimit: 500000 // Increased gas limit for debugging
       }
     );
 
@@ -234,6 +243,11 @@ async function executeArbitrage(opportunity) {
 
     // Wait for confirmation
     const receipt = await tx.wait();
+    
+    if (receipt.status === 0) {
+      throw new Error(`Transaction failed with status 0. Gas used: ${receipt.gasUsed.toString()}`);
+    }
+    
     console.log("Arbitrage executed successfully:", receipt.transactionHash);
 
     return {
@@ -384,6 +398,31 @@ app.post('/api/stop-bot', (req, res) => {
   res.json({ success: true, message: "Arbitrage bot stopped" });
 });
 
+app.post('/api/test-contract', async (req, res) => {
+  try {
+    if (!contract) {
+      return res.status(400).json({ error: "Contract not deployed" });
+    }
+
+    // Test contract by calling a view function
+    const owner = await contract.owner();
+    const minProfit = await contract.minProfitBasisPoints();
+    
+    res.json({
+      success: true,
+      contractWorking: true,
+      owner,
+      minProfitBasisPoints: minProfit.toString()
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      contractWorking: false
+    });
+  }
+});
+
 app.get('/api/status', async (req, res) => {
   try {
     const balance = wallet ? await wallet.getBalance() : 0;
@@ -396,6 +435,24 @@ app.get('/api/status', async (req, res) => {
       botRunning: isMonitoring,
       network: "Base Mainnet"
     });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/debug', async (req, res) => {
+  try {
+    const debug = {
+      contractAddress,
+      contractABI: !!contractABI,
+      walletAddress: wallet?.address,
+      balance: wallet ? ethers.utils.formatEther(await wallet.getBalance()) : "0",
+      gasPrice: await provider.getGasPrice().then(gp => ethers.utils.formatUnits(gp, "gwei")),
+      blockNumber: await provider.getBlockNumber(),
+      contractCode: contract ? await provider.getCode(contractAddress) : null
+    };
+
+    res.json({ debug });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
