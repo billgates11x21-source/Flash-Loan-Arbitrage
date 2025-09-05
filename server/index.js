@@ -12,7 +12,7 @@ const PRIVATE_KEY = process.env.PRIVATE_KEY || "0xd46c12869e0e964d117b67f39deb8c
 const DEXSCREENER_API_BASE = "https://api.dexscreener.com";
 
 // Contract configuration
-let contractAddress = process.env.CONTRACT_ADDRESS || "0x8dc3d3eeca945f83772f746610aA7FB4b86a1e82";
+let contractAddress = process.env.CONTRACT_ADDRESS || "0x8dC3D3eeca945F83772F746610aA7FB4b86a1e82";
 let contractABI = null;
 let provider = null;
 let wallet = null;
