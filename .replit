@@ -6,7 +6,7 @@ expertMode = true
 channel = "stable-25_05"
 
 [workflows]
-runButton = "Backend Only"
+runButton = "Start Trading Bot"
 
 [[workflows.workflow]]
 name = "Project"
@@ -72,6 +72,15 @@ args = "npm run backend"
 
 [[workflows.workflow]]
 name = "Start Arbitrage Trading"
+author = 47260668
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node server/index.js"
+
+[[workflows.workflow]]
+name = "Start Trading Bot"
 author = 47260668
 mode = "sequential"
 

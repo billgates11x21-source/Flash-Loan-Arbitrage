@@ -101,12 +101,13 @@ async function findArbitrageOpportunities() {
               const priceDiffPercent = (priceDiff / avgPrice) * 100;
 
               // Require minimum liquidity and reasonable price difference
-              const minLiquidity = 1000; // $1000 minimum
-              if (priceDiffPercent > 2.0 && priceDiffPercent < 20 && // Reduced max diff to avoid extreme outliers
+              const minLiquidity = 100; // $100 minimum (reduced for more opportunities)
+              if (priceDiffPercent > 1.0 && priceDiffPercent < 10 && // More conservative range
                   pair1.liquidity?.usd > minLiquidity && 
                   pair2.liquidity?.usd > minLiquidity &&
-                  price1 > 0.000001 && price2 > 0.000001 && // Ensure prices aren't too small
-                  price1 < 1000000 && price2 < 1000000) { // Ensure prices aren't too large
+                  price1 > 0.0001 && price2 > 0.0001 && // More reasonable minimum prices
+                  price1 < 100000 && price2 < 100000 && // More reasonable maximum prices
+                  Math.abs(Math.log10(price1/price2)) < 2) { // Ensure prices aren't too far apart (max 100x difference)
                 opportunities.push({
                   tokenIn: pair1.baseToken.address,
                   tokenOut: pair1.quoteToken.address,
@@ -159,23 +160,23 @@ async function executeArbitrage(opportunity) {
 
     // Calculate optimal loan amount based on liquidity
     const minLiquidity = Math.min(opportunity.liquidity1, opportunity.liquidity2);
-    const maxLoanAmount = Math.max(1, Math.floor(minLiquidity * 0.1)); // Use 10% of minimum liquidity, minimum 1
-
-    // Determine token decimals and convert properly
-    let decimals = 18; // Default to 18 decimals for most tokens
+    
+    // Use a safe fixed amount to avoid decimal parsing issues
     let loanAmount;
     
     try {
-      // For very small amounts, use a minimum viable amount
-      if (maxLoanAmount < 1) {
-        loanAmount = ethers.utils.parseUnits("1", decimals);
+      // Use a reasonable fixed amount based on liquidity
+      if (minLiquidity >= 1000) {
+        loanAmount = ethers.utils.parseEther("0.01"); // 0.01 ETH for good liquidity
+      } else if (minLiquidity >= 100) {
+        loanAmount = ethers.utils.parseEther("0.001"); // 0.001 ETH for medium liquidity
       } else {
-        // Parse without decimals to avoid precision issues
-        loanAmount = ethers.utils.parseUnits(Math.floor(maxLoanAmount).toString(), decimals);
+        loanAmount = ethers.utils.parseEther("0.0001"); // 0.0001 ETH for low liquidity
       }
     } catch (error) {
-      // Fallback to a safe minimum amount
-      loanAmount = ethers.utils.parseUnits("1", decimals);
+      // Fallback to smallest safe amount
+      loanAmount = ethers.utils.parseEther("0.0001");
+      console.log("Using fallback loan amount:", ethers.utils.formatEther(loanAmount));
     }
 
     // Prepare arbitrage parameters
