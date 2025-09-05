@@ -158,6 +158,16 @@ async function executeArbitrage(opportunity) {
       throw new Error("Contract not deployed or initialized");
     }
 
+    // Check wallet balance for gas
+    const balance = await wallet.getBalance();
+    const minBalance = ethers.utils.parseEther("0.001"); // 0.001 ETH minimum
+    
+    if (balance.lt(minBalance)) {
+      throw new Error(`Insufficient ETH balance for gas. Current: ${ethers.utils.formatEther(balance)} ETH`);
+    }
+
+    console.log(`💰 Wallet balance: ${ethers.utils.formatEther(balance)} ETH`);
+
     // Calculate optimal loan amount based on liquidity
     const minLiquidity = Math.min(opportunity.liquidity1, opportunity.liquidity2);
     
@@ -179,17 +189,17 @@ async function executeArbitrage(opportunity) {
       console.log("Using fallback loan amount:", ethers.utils.formatEther(loanAmount));
     }
 
-    // Prepare arbitrage parameters
-    const arbParams = {
-      tokenIn: opportunity.tokenIn,
-      tokenOut: opportunity.tokenOut,
-      amountIn: loanAmount,
-      fee1: 3000, // 0.3% fee
-      fee2: 500,  // 0.05% fee
-      useAerodrome: opportunity.dex1 === 'aerodrome' || opportunity.dex2 === 'aerodrome'
-    };
+    // Prepare arbitrage parameters as array (not object)
+    const arbParams = [
+      opportunity.tokenIn,
+      opportunity.tokenOut,
+      loanAmount,
+      3000, // fee1: 0.3% fee
+      500,  // fee2: 0.05% fee
+      opportunity.dex1 === 'aerodrome' || opportunity.dex2 === 'aerodrome' // useAerodrome
+    ];
 
-    // Encode parameters
+    // Encode parameters correctly as tuple
     const encodedParams = ethers.utils.defaultAbiCoder.encode(
       ['tuple(address,address,uint256,uint24,uint24,bool)'],
       [arbParams]
@@ -257,14 +267,22 @@ async function startArbitrageBot() {
         const bestOpportunity = opportunities[0];
 
         if (bestOpportunity.priceDiff > 1.0) { // Only execute if >1% profit potential
-          console.log("Executing arbitrage:", bestOpportunity);
+          console.log(`🚀 EXECUTING ARBITRAGE:`);
+          console.log(`   Token: ${bestOpportunity.tokenIn} -> ${bestOpportunity.tokenOut}`);
+          console.log(`   Price Diff: ${bestOpportunity.priceDiff.toFixed(2)}%`);
+          console.log(`   DEX1: ${bestOpportunity.dex1}, DEX2: ${bestOpportunity.dex2}`);
+          console.log(`   Liquidity: $${bestOpportunity.liquidity1.toFixed(0)} / $${bestOpportunity.liquidity2.toFixed(0)}`);
+          
           const result = await executeArbitrage(bestOpportunity);
 
           if (result.success) {
-            console.log("Arbitrage successful! TX:", result.txHash);
+            console.log(`✅ ARBITRAGE SUCCESS! TX: ${result.txHash}`);
+            console.log(`   Gas Used: ${result.gasUsed}`);
           } else {
-            console.log("Arbitrage failed:", result.error);
+            console.log(`❌ ARBITRAGE FAILED: ${result.error}`);
           }
+        } else {
+          console.log(`⏭️  Skipping opportunity: ${bestOpportunity.priceDiff.toFixed(2)}% profit too low`);
         }
       } else {
         console.log("No profitable opportunities found");
