@@ -6,7 +6,7 @@ expertMode = true
 channel = "stable-25_05"
 
 [workflows]
-runButton = "Project"
+runButton = "Backend Only"
 
 [[workflows.workflow]]
 name = "Project"
@@ -60,6 +60,15 @@ waitForPort = 5000
 
 [workflows.workflow.metadata]
 outputType = "webview"
+
+[[workflows.workflow]]
+name = "Backend Only"
+author = 47260668
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run backend"
 
 [[ports]]
 localPort = 3001

@@ -1,6 +1,6 @@
+
 const express = require('express');
 const { ethers } = require('ethers');
-const hre = require('hardhat');
 const cors = require('cors');
 const app = express();
 
@@ -9,15 +9,23 @@ app.use(express.json());
 
 // Base network configuration
 const BASE_RPC_URL = "https://mainnet.base.org";
-const PRIVATE_KEY = "0xd46c12869e0e964d117b67f39deb8c2a8359aaede080162ab0c0acefb234f5e8";
+const PRIVATE_KEY = process.env.PRIVATE_KEY || "0xd46c12869e0e964d117b67f39deb8c2a8359aaede080162ab0c0acefb234f5e8";
 const DEXSCREENER_API_BASE = "https://api.dexscreener.com";
 
 // Contract configuration
-let contractAddress = null;
+let contractAddress = process.env.CONTRACT_ADDRESS || null;
 let contractABI = null;
 let provider = null;
 let wallet = null;
 let contract = null;
+
+// Load contract ABI
+try {
+  const contractArtifact = require('../artifacts/contracts/BaseFlashLoanArbitrage.sol/BaseFlashLoanArbitrage.json');
+  contractABI = contractArtifact.abi;
+} catch (error) {
+  console.log("Contract artifact not found, deploy contract first");
+}
 
 // Initialize blockchain connection
 async function initializeBlockchain() {
@@ -28,6 +36,12 @@ async function initializeBlockchain() {
     console.log("Wallet address:", wallet.address);
     const balance = await wallet.getBalance();
     console.log("Wallet balance:", ethers.utils.formatEther(balance), "ETH");
+    
+    // Initialize contract if address and ABI are available
+    if (contractAddress && contractABI) {
+      contract = new ethers.Contract(contractAddress, contractABI, wallet);
+      console.log("Contract initialized at:", contractAddress);
+    }
     
     return true;
   } catch (error) {
@@ -126,7 +140,7 @@ async function getOptimalGasPrice() {
 async function executeArbitrage(opportunity) {
   try {
     if (!contract) {
-      throw new Error("Contract not initialized");
+      throw new Error("Contract not deployed or initialized");
     }
     
     // Calculate optimal loan amount based on liquidity
@@ -254,25 +268,30 @@ app.get('/api/opportunities', async (req, res) => {
 
 app.post('/api/deploy', async (req, res) => {
   try {
-    // Direct deployment using ethers v5 compatible approach
     console.log("Deploying BaseFlashLoanArbitrage contract to Base network...");
     
     const AAVE_POOL_ADDRESSES_PROVIDER = "0xe20fcbdbffc4dd138ce8b2e6fbb6cb49777ad64d";
     
-    // Create contract factory
-    const contractABI = [
-      "constructor(address _addressProvider)"
-    ];
+    if (!contractABI) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Contract ABI not found. Please compile contracts first." 
+      });
+    }
     
-    const contractBytecode = require('../artifacts/contracts/BaseFlashLoanArbitrage.sol/BaseFlashLoanArbitrage.json').bytecode;
+    // Load bytecode
+    const contractArtifact = require('../artifacts/contracts/BaseFlashLoanArbitrage.sol/BaseFlashLoanArbitrage.json');
+    const contractBytecode = contractArtifact.bytecode;
     
     const factory = new ethers.ContractFactory(contractABI, contractBytecode, wallet);
     
     // Deploy contract
-    const contract = await factory.deploy(AAVE_POOL_ADDRESSES_PROVIDER);
-    await contract.deployed();
+    const deployedContract = await factory.deploy(AAVE_POOL_ADDRESSES_PROVIDER);
+    await deployedContract.deployed();
     
-    contractAddress = contract.address;
+    contractAddress = deployedContract.address;
+    contract = deployedContract;
+    
     console.log(`BaseFlashLoanArbitrage deployed to: ${contractAddress}`);
     
     res.json({ 
@@ -290,8 +309,8 @@ app.post('/api/deploy', async (req, res) => {
 
 app.post('/api/start-bot', async (req, res) => {
   try {
-    if (!contractAddress) {
-      return res.status(400).json({ error: "Contract not deployed" });
+    if (!contract) {
+      return res.status(400).json({ error: "Contract not deployed or initialized" });
     }
     
     startArbitrageBot();
@@ -314,6 +333,7 @@ app.get('/api/status', async (req, res) => {
       walletAddress: wallet?.address,
       balance: balance ? ethers.utils.formatEther(balance) : "0",
       contractAddress,
+      contractDeployed: !!contract,
       botRunning: isMonitoring,
       network: "Base Mainnet"
     });
@@ -321,6 +341,9 @@ app.get('/api/status', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// Serve static files
+app.use(express.static('client'));
 
 // Initialize and start server
 async function startServer() {
@@ -335,6 +358,7 @@ async function startServer() {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Arbitrage backend running on port ${PORT}`);
     console.log(`Wallet: ${wallet.address}`);
+    console.log(`Dashboard: http://localhost:${PORT}`);
   });
 }
 
