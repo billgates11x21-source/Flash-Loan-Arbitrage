@@ -142,12 +142,11 @@ async function findArbitrageOpportunities() {
 async function getOptimalGasPrice() {
   try {
     const gasPrice = await provider.getGasPrice();
-    // Add 10% buffer for faster execution
-    const optimizedGasPrice = gasPrice.mul(110).div(100);
-    return optimizedGasPrice;
+    // Use current gas price without buffer to save on gas
+    return gasPrice;
   } catch (error) {
     console.error("Error getting gas price:", error);
-    return ethers.utils.parseUnits("1", "gwei"); // Fallback
+    return ethers.utils.parseUnits("0.5", "gwei"); // Lower fallback
   }
 }
 
@@ -160,10 +159,10 @@ async function executeArbitrage(opportunity) {
 
     // Check wallet balance for gas
     const balance = await wallet.getBalance();
-    const minBalance = ethers.utils.parseEther("0.001"); // 0.001 ETH minimum
+    const minBalance = ethers.utils.parseEther("0.0005"); // 0.0005 ETH minimum (reduced)
     
     if (balance.lt(minBalance)) {
-      throw new Error(`Insufficient ETH balance for gas. Current: ${ethers.utils.formatEther(balance)} ETH`);
+      throw new Error(`Insufficient ETH balance for gas. Current: ${ethers.utils.formatEther(balance)} ETH. Need at least 0.0005 ETH.`);
     }
 
     console.log(`💰 Wallet balance: ${ethers.utils.formatEther(balance)} ETH`);
@@ -208,14 +207,14 @@ async function executeArbitrage(opportunity) {
     // Get optimal gas price
     const gasPrice = await getOptimalGasPrice();
 
-    // Execute flash loan arbitrage
+    // Execute flash loan arbitrage with reduced gas limit
     const tx = await contract.executeFlashLoanArbitrage(
       opportunity.tokenIn,
       loanAmount,
       encodedParams,
       {
         gasPrice: gasPrice,
-        gasLimit: 500000
+        gasLimit: 300000 // Reduced gas limit
       }
     );
 
