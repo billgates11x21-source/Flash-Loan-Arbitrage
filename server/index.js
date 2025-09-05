@@ -12,7 +12,7 @@ const PRIVATE_KEY = process.env.PRIVATE_KEY || "0xd46c12869e0e964d117b67f39deb8c
 const DEXSCREENER_API_BASE = "https://api.dexscreener.com";
 
 // Contract configuration
-let contractAddress = process.env.CONTRACT_ADDRESS || null;
+let contractAddress = process.env.CONTRACT_ADDRESS || "0x8dc3d3eeca945f83772f746610aA7FB4b86a1e82";
 let contractABI = null;
 let provider = null;
 let wallet = null;
@@ -102,9 +102,11 @@ async function findArbitrageOpportunities() {
 
               // Require minimum liquidity and reasonable price difference
               const minLiquidity = 1000; // $1000 minimum
-              if (priceDiffPercent > 2.0 && priceDiffPercent < 50 && 
+              if (priceDiffPercent > 2.0 && priceDiffPercent < 20 && // Reduced max diff to avoid extreme outliers
                   pair1.liquidity?.usd > minLiquidity && 
-                  pair2.liquidity?.usd > minLiquidity) {
+                  pair2.liquidity?.usd > minLiquidity &&
+                  price1 > 0.000001 && price2 > 0.000001 && // Ensure prices aren't too small
+                  price1 < 1000000 && price2 < 1000000) { // Ensure prices aren't too large
                 opportunities.push({
                   tokenIn: pair1.baseToken.address,
                   tokenOut: pair1.quoteToken.address,
@@ -157,10 +159,24 @@ async function executeArbitrage(opportunity) {
 
     // Calculate optimal loan amount based on liquidity
     const minLiquidity = Math.min(opportunity.liquidity1, opportunity.liquidity2);
-    const maxLoanAmount = minLiquidity * 0.1; // Use 10% of minimum liquidity
+    const maxLoanAmount = Math.max(1, Math.floor(minLiquidity * 0.1)); // Use 10% of minimum liquidity, minimum 1
 
-    // Convert to wei (assuming USDC with 6 decimals)
-    const loanAmount = ethers.utils.parseUnits(maxLoanAmount.toString(), 6);
+    // Determine token decimals and convert properly
+    let decimals = 18; // Default to 18 decimals for most tokens
+    let loanAmount;
+    
+    try {
+      // For very small amounts, use a minimum viable amount
+      if (maxLoanAmount < 1) {
+        loanAmount = ethers.utils.parseUnits("1", decimals);
+      } else {
+        // Parse without decimals to avoid precision issues
+        loanAmount = ethers.utils.parseUnits(Math.floor(maxLoanAmount).toString(), decimals);
+      }
+    } catch (error) {
+      // Fallback to a safe minimum amount
+      loanAmount = ethers.utils.parseUnits("1", decimals);
+    }
 
     // Prepare arbitrage parameters
     const arbParams = {
