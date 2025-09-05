@@ -11,8 +11,8 @@ const BASE_RPC_URL = "https://mainnet.base.org";
 const PRIVATE_KEY = process.env.PRIVATE_KEY || "0xd46c12869e0e964d117b67f39deb8c2a8359aaede080162ab0c0acefb234f5e8";
 const DEXSCREENER_API_BASE = "https://api.dexscreener.com";
 
-// Contract configuration
-let contractAddress = process.env.CONTRACT_ADDRESS || "0x8dC3D3eeca945F83772F746610aA7FB4b86a1e82";
+// Contract configuration - use proper checksummed address
+let contractAddress = process.env.CONTRACT_ADDRESS || ethers.utils.getAddress("0x8dc3d3eeca945f83772f746610aa7fb4b86a1e82");
 let contractABI = null;
 let provider = null;
 let wallet = null;
@@ -188,28 +188,40 @@ async function executeArbitrage(opportunity) {
       console.log("Using fallback loan amount:", ethers.utils.formatEther(loanAmount));
     }
 
-    // Prepare arbitrage parameters as array (not object)
-    const arbParams = [
-      opportunity.tokenIn,
-      opportunity.tokenOut,
-      loanAmount,
-      3000, // fee1: 0.3% fee
-      500,  // fee2: 0.05% fee
-      opportunity.dex1 === 'aerodrome' || opportunity.dex2 === 'aerodrome' // useAerodrome
-    ];
+    // Prepare arbitrage parameters as individual values for proper encoding
+    const tokenIn = opportunity.tokenIn;
+    const tokenOut = opportunity.tokenOut;
+    const amountIn = loanAmount;
+    const fee1 = 3000; // 0.3% fee
+    const fee2 = 500;  // 0.05% fee  
+    const useAerodrome = opportunity.dex1 === 'aerodrome' || opportunity.dex2 === 'aerodrome';
 
-    // Encode parameters correctly as tuple
+    // Create struct matching ArbitrageParams in smart contract
+    const arbParams = {
+      tokenIn: tokenIn,
+      tokenOut: tokenOut,  
+      amountIn: amountIn,
+      fee1: fee1,
+      fee2: fee2,
+      useAerodrome: useAerodrome
+    };
+
+    // Encode as tuple struct matching smart contract
     const encodedParams = ethers.utils.defaultAbiCoder.encode(
-      ['tuple(address,address,uint256,uint24,uint24,bool)'],
+      ['tuple(address tokenIn, address tokenOut, uint256 amountIn, uint24 fee1, uint24 fee2, bool useAerodrome)'],
       [arbParams]
     );
 
     // Get optimal gas price
     const gasPrice = await getOptimalGasPrice();
 
+    // Validate contract address before execution
+    const validatedContractAddress = ethers.utils.getAddress(contractAddress);
+    console.log(`Using validated contract address: ${validatedContractAddress}`);
+
     // Execute flash loan arbitrage with reduced gas limit
     const tx = await contract.executeFlashLoanArbitrage(
-      opportunity.tokenIn,
+      ethers.utils.getAddress(opportunity.tokenIn),
       loanAmount,
       encodedParams,
       {
@@ -271,6 +283,7 @@ async function startArbitrageBot() {
           console.log(`   Price Diff: ${bestOpportunity.priceDiff.toFixed(2)}%`);
           console.log(`   DEX1: ${bestOpportunity.dex1}, DEX2: ${bestOpportunity.dex2}`);
           console.log(`   Liquidity: $${bestOpportunity.liquidity1.toFixed(0)} / $${bestOpportunity.liquidity2.toFixed(0)}`);
+          console.log(`   Contract Address: ${contractAddress}`);
           
           const result = await executeArbitrage(bestOpportunity);
 
